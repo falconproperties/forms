@@ -4,8 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Super Admin Panel — Forms by Falcon Properties</title>
-<link rel="icon" href="assets/logo.png">
-<link rel="stylesheet" href="shared/styles.css">
+<link rel="icon" href="logo.png">
+<link rel="stylesheet" href="styles.css">
 <style>
   .topbar{ background:var(--ink); border-bottom:1px solid var(--gold-line); padding:16px 0; }
   .topbar .container{ display:flex; align-items:center; justify-content:space-between; }
@@ -46,7 +46,7 @@
 <div class="topbar">
   <div class="container">
     <div class="brand-mini">
-      <img src="assets/logo.png" alt="">
+      <img src="logo.png" alt="">
       <div><span>Forms by Falcon Properties</span><small>Super Admin</small></div>
     </div>
     <button class="btn btn-ghost" id="logoutBtn" style="color:var(--creme); border-color:var(--gold-line);">Sign Out</button>
@@ -88,7 +88,7 @@
 import {
   auth, db, onAuthStateChanged, signOut, doc, getDoc, setDoc, updateDoc, deleteDoc,
   collection, getDocs, query, where, toast, getClientIP, isIPAllowed
-} from './shared/app-core.js';
+} from 'app-core.js';
 
 document.getElementById('logoutBtn').addEventListener('click', async ()=>{ await signOut(auth); window.location.href='superadmin.html'; });
 
