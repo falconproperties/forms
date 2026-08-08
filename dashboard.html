@@ -4,8 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Dashboard — Forms by Falcon Properties</title>
-<link rel="icon" href="assets/logo.png">
-<link rel="stylesheet" href="shared/styles.css">
+<link rel="icon" href="logo.png">
+<link rel="stylesheet" href="styles.css">
 <style>
   .topbar{ background:var(--ivory-panel); border-bottom:1px solid var(--gold-line); padding:16px 0; position:sticky; top:0; z-index:50; }
   .topbar .container{ display:flex; align-items:center; justify-content:space-between; }
@@ -36,7 +36,7 @@
 <div class="topbar">
   <div class="container">
     <div class="brand-mini">
-      <img src="assets/logo.png" alt="">
+      <img src="logo.png" alt="">
       <div><span>Forms by Falcon Properties</span><small id="userEmail">Creator</small></div>
     </div>
     <button class="btn btn-ghost" id="logoutBtn">Sign Out</button>
@@ -60,7 +60,7 @@ import {
   auth, db, onAuthStateChanged, signOut, doc, getDoc, addDoc, updateDoc, deleteDoc,
   collection, getDocs, query, where, orderBy, serverTimestamp, toast,
   getClientIP, isIPAllowed, randomSlug
-} from './shared/app-core.js';
+} from 'app-core.js';
 
 let currentUser = null;
 
