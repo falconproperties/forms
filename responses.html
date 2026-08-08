@@ -4,8 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Responses — Forms by Falcon Properties</title>
-<link rel="icon" href="assets/logo.png">
-<link rel="stylesheet" href="shared/styles.css">
+<link rel="icon" href="logo.png">
+<link rel="stylesheet" href="styles.css">
 <style>
   .topbar{ background:var(--ivory-panel); border-bottom:1px solid var(--gold-line); padding:14px 0; }
   .topbar .container{ display:flex; align-items:center; justify-content:space-between; }
@@ -25,7 +25,7 @@
 <div class="topbar">
   <div class="container">
     <div style="display:flex; align-items:center; gap:12px;">
-      <img src="assets/logo.png" style="width:28px;">
+      <img src="logo.png" style="width:28px;">
       <span style="font-family:'Fraunces',serif; font-weight:700; font-size:16px;" id="formTitleLbl">Responses</span>
     </div>
     <a href="dashboard.html" class="btn btn-ghost">← Dashboard</a>
@@ -44,7 +44,7 @@
 </div>
 
 <script type="module">
-import { auth, db, onAuthStateChanged, doc, getDoc, getDocs, collection, toast, getClientIP, isIPAllowed } from './shared/app-core.js';
+import { auth, db, onAuthStateChanged, doc, getDoc, getDocs, collection, toast, getClientIP, isIPAllowed } from 'app-core.js';
 
 const formId = new URLSearchParams(window.location.search).get('id');
 let schema = [], rows = [];
