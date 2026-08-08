@@ -4,8 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Forms by Falcon Properties — Creator Login</title>
-<link rel="icon" href="assets/logo.png">
-<link rel="stylesheet" href="shared/styles.css">
+<link rel="icon" href="logo.png">
+<link rel="stylesheet" href="styles.css">
 <style>
   .wrap{ width:100%; max-width:400px; padding:20px; }
   .logo-badge{ display:flex; flex-direction:column; align-items:center; margin-bottom:26px; }
@@ -27,7 +27,7 @@
 <div class="center-screen">
   <div class="wrap">
     <div class="logo-badge">
-      <img src="assets/logo.png" alt="Falcon Properties">
+      <img src="logo.png" alt="Falcon Properties">
       <div class="brand">Forms by Falcon Properties</div>
       <div class="tag">Key to your dream</div>
     </div>
@@ -65,7 +65,7 @@
 import {
   auth, db, signInWithEmailAndPassword, createUserWithEmailAndPassword,
   doc, getDoc, setDoc, serverTimestamp, toast, getClientIP, isIPAllowed
-} from './shared/app-core.js';
+} from 'app-core.js';
 
 let mode = 'login'; // or 'signup'
 const formTitle = document.getElementById('formTitle');
