@@ -4,8 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Super Admin — Forms by Falcon Properties</title>
-<link rel="icon" href="assets/logo.png">
-<link rel="stylesheet" href="shared/styles.css">
+<link rel="icon" href="logo.png">
+<link rel="stylesheet" href="styles.css">
 <style>
   body{ background:var(--ink); }
   .wrap{ width:100%; max-width:380px; padding:20px; }
@@ -29,7 +29,7 @@
 <div class="center-screen">
   <div class="wrap">
     <div class="logo-badge">
-      <img src="assets/logo.png" alt="Falcon Properties">
+      <img src="logo.png" alt="Falcon Properties">
       <div class="brand">Forms by Falcon Properties</div>
       <div class="tag">Super Admin</div>
     </div>
@@ -58,7 +58,7 @@
 <script type="module">
 import {
   auth, db, signInWithEmailAndPassword, doc, getDoc, toast, getClientIP, isIPAllowed
-} from './shared/app-core.js';
+} from 'app-core.js';
 
 document.getElementById('authForm').addEventListener('submit', async (e)=>{
   e.preventDefault();
