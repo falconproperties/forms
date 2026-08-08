@@ -1,0 +1,54 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() { return request.auth != null; }
+    function myUser() { return get(/databases/$(database)/documents/users/$(request.auth.uid)); }
+    function isSuperAdmin() { return isSignedIn() && myUser().data.role == 'superadmin'; }
+    function isApprovedCreator() {
+      return isSignedIn() && myUser().data.role == 'creator' && myUser().data.allowedByAdmin == true;
+    }
+
+    // ---- users ----
+    match /users/{uid} {
+      allow read: if isSignedIn() && (request.auth.uid == uid || isSuperAdmin());
+      // Anyone can create their OWN creator doc at signup, but cannot self-grant approval or superadmin role
+      allow create: if isSignedIn() && request.auth.uid == uid
+                    && request.resource.data.role == 'creator'
+                    && request.resource.data.allowedByAdmin == false;
+      // Only super admin can flip allowedByAdmin / change roles
+      allow update: if isSuperAdmin();
+      allow delete: if isSuperAdmin();
+    }
+
+    // ---- ipWhitelist ---- only super admin manages; readable by any signed-in user (needed for the client-side gate check)
+    match /ipWhitelist/{ip} {
+      allow read: if isSignedIn();
+      allow write: if isSuperAdmin();
+    }
+
+    // ---- forms ----
+    match /forms/{formId} {
+      // Public can read a form ONLY if published (needed for the anonymous fill page)
+      allow get: if resource.data.status == 'published'
+                 || (isApprovedCreator() && resource.data.creatorId == request.auth.uid)
+                 || isSuperAdmin();
+      // NOTE: Firestore evaluates `list` rules against the query's declared constraints, not
+      // per-document results — so any client query against this collection MUST include an
+      // explicit `where('status','==','published')` clause to satisfy the first branch below.
+      allow list: if resource.data.status == 'published' || isApprovedCreator() || isSuperAdmin();
+      allow create: if isApprovedCreator() && request.resource.data.creatorId == request.auth.uid;
+      allow update, delete: if (isApprovedCreator() && resource.data.creatorId == request.auth.uid) || isSuperAdmin();
+
+      // ---- submissions: anonymous create, creator-only read ----
+      match /entries/{entryId} {
+        allow create: if get(/databases/$(database)/documents/forms/$(formId)).data.status == 'published';
+        allow read: if isSignedIn() && (
+                      get(/databases/$(database)/documents/forms/$(formId)).data.creatorId == request.auth.uid
+                      || isSuperAdmin()
+                    );
+        allow update, delete: if false; // submissions are immutable once made
+      }
+    }
+  }
+}

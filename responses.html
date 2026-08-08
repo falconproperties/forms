@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Responses — Forms by Falcon Properties</title>
+<link rel="icon" href="assets/logo.png">
+<link rel="stylesheet" href="shared/styles.css">
+<style>
+  .topbar{ background:var(--ivory-panel); border-bottom:1px solid var(--gold-line); padding:14px 0; }
+  .topbar .container{ display:flex; align-items:center; justify-content:space-between; }
+  .main{ padding:32px 0 60px; }
+  .head-row{ display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:22px; flex-wrap:wrap; gap:12px; }
+  .head-row h1{ font-size:24px; }
+  .table-wrap{ overflow-x:auto; }
+  table{ border-collapse:collapse; width:100%; font-size:13px; }
+  th,td{ padding:10px 14px; border-bottom:1px solid var(--gold-line); text-align:left; white-space:nowrap; max-width:220px; overflow:hidden; text-overflow:ellipsis; }
+  th{ background:var(--creme-deep); font-size:11px; letter-spacing:.05em; text-transform:uppercase; color:var(--gold-deep); position:sticky; top:0; }
+  tr:hover td{ background:rgba(201,162,39,0.04); }
+  .empty{ text-align:center; padding:60px; color:var(--ink-soft); }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="container">
+    <div style="display:flex; align-items:center; gap:12px;">
+      <img src="assets/logo.png" style="width:28px;">
+      <span style="font-family:'Fraunces',serif; font-weight:700; font-size:16px;" id="formTitleLbl">Responses</span>
+    </div>
+    <a href="dashboard.html" class="btn btn-ghost">← Dashboard</a>
+  </div>
+</div>
+
+<div class="main container">
+  <div class="head-row">
+    <div>
+      <div class="eyebrow" id="countLbl">Loading…</div>
+      <h1>Responses</h1>
+    </div>
+    <button class="btn btn-gold" id="exportBtn">Export CSV</button>
+  </div>
+  <div class="panel table-wrap"><table id="respTable"></table></div>
+</div>
+
+<script type="module">
+import { auth, db, onAuthStateChanged, doc, getDoc, getDocs, collection, toast, getClientIP, isIPAllowed } from './shared/app-core.js';
+
+const formId = new URLSearchParams(window.location.search).get('id');
+let schema = [], rows = [];
+
+onAuthStateChanged(auth, async (user)=>{
+  if(!user){ window.location.href='index.html'; return; }
+  const uDoc = await getDoc(doc(db,'users',user.uid));
+  if(!uDoc.exists() || !uDoc.data().allowedByAdmin){ window.location.href='index.html'; return; }
+  const ip = await getClientIP();
+  if(!(await isIPAllowed(ip))){ window.location.href='blocked.html'; return; }
+
+  const formSnap = await getDoc(doc(db,'forms',formId));
+  if(!formSnap.exists() || formSnap.data().creatorId !== user.uid){ toast('Not found',true); window.location.href='dashboard.html'; return; }
+  const form = formSnap.data();
+  schema = (form.schema||[]).filter(f=> !['section','page_break','image_block'].includes(f.type));
+  document.getElementById('formTitleLbl').textContent = form.title;
+
+  const entriesSnap = await getDocs(collection(db,'forms',formId,'entries'));
+  rows = []; entriesSnap.forEach(d=> rows.push(d.data()));
+  document.getElementById('countLbl').textContent = `${rows.length} response${rows.length===1?'':'s'}`;
+  renderTable();
+});
+
+function renderTable(){
+  const table = document.getElementById('respTable');
+  if(rows.length===0){ table.outerHTML = '<div class="empty">No responses yet.</div>'; return; }
+
+  let html = '<thead><tr><th>#</th><th>Submitted</th>' + schema.map(f=>`<th>${esc(f.label)}</th>`).join('') + '</tr></thead><tbody>';
+  rows.forEach((r,i)=>{
+    const date = r.submittedAt?.toDate ? r.submittedAt.toDate().toLocaleString() : '—';
+    html += `<tr><td>${i+1}</td><td>${date}</td>` + schema.map(f=>`<td>${esc(formatAns(r.answers?.[f.id]))}</td>`).join('') + '</tr>';
+  });
+  table.innerHTML = html + '</tbody>';
+}
+
+function formatAns(v){
+  if(v===undefined || v===null) return '';
+  if(Array.isArray(v)) return v.join(', ');
+  if(typeof v === 'object'){
+    if(v.name) return v.name; // file
+    return Object.entries(v).map(([k,val])=>`${k}: ${val}`).join('; '); // matrix
+  }
+  if(typeof v === 'boolean') return v ? 'Yes' : 'No';
+  return String(v);
+}
+
+document.getElementById('exportBtn').addEventListener('click', ()=>{
+  if(rows.length===0){ toast('No responses to export', true); return; }
+  const headers = ['#','Submitted', ...schema.map(f=>f.label)];
+  const lines = [headers.map(csvCell).join(',')];
+  rows.forEach((r,i)=>{
+    const date = r.submittedAt?.toDate ? r.submittedAt.toDate().toLocaleString() : '';
+    const line = [i+1, date, ...schema.map(f=> formatAns(r.answers?.[f.id]))].map(csvCell).join(',');
+    lines.push(line);
+  });
+  const blob = new Blob([lines.join('\n')], { type:'text/csv' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'responses.csv';
+  a.click();
+});
+function csvCell(v){ const s = String(v ?? ''); return `"${s.replace(/"/g,'""')}"`; }
+function esc(s){ return String(s??'').replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+</script>
+</body>
+</html>

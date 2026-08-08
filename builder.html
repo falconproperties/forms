@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Form Builder — Forms by Falcon Properties</title>
+<link rel="icon" href="assets/logo.png">
+<link rel="stylesheet" href="shared/styles.css">
+<style>
+  body{ overflow-x:hidden; }
+  .topbar{ background:var(--ivory-panel); border-bottom:1px solid var(--gold-line); padding:12px 24px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:100; }
+  .topbar-left{ display:flex; align-items:center; gap:14px; }
+  .topbar-left img{ width:28px; }
+  #titleInput{ font-family:'Fraunces',serif; font-weight:700; font-size:16px; border:none; background:transparent; padding:6px 8px; border-radius:4px; max-width:280px; }
+  #titleInput:focus{ background:var(--creme-deep); outline:none; }
+  .topbar-right{ display:flex; align-items:center; gap:10px; }
+  .status-toggle{ display:flex; align-items:center; gap:8px; font-size:12.5px; color:var(--ink-soft); }
+  .switch{ position:relative; width:40px; height:22px; }
+  .switch input{ opacity:0; width:0; height:0; }
+  .slider-toggle{ position:absolute; inset:0; background:#D8CFB4; border-radius:20px; cursor:pointer; transition:.25s; }
+  .slider-toggle::before{ content:""; position:absolute; width:16px; height:16px; left:3px; top:3px; background:#fff; border-radius:50%; transition:.25s; }
+  input:checked + .slider-toggle{ background:var(--success); }
+  input:checked + .slider-toggle::before{ transform:translateX(18px); }
+
+  .builder-layout{ display:grid; grid-template-columns:230px 1fr 300px; height:calc(100vh - 57px); }
+  @media(max-width:1100px){ .builder-layout{ grid-template-columns:200px 1fr 270px; } }
+
+  /* ---- Palette ---- */
+  .palette{ background:var(--creme-deep); border-right:1px solid var(--gold-line); overflow-y:auto; padding:18px 14px; }
+  .palette h4{ font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:var(--gold-deep); margin-bottom:12px; }
+  .palette-item{ display:flex; align-items:center; gap:10px; padding:10px 12px; margin-bottom:6px; background:var(--ivory-panel); border:1px solid var(--gold-line); border-radius:4px; cursor:grab; font-size:12.5px; font-weight:500; transition:.15s; }
+  .palette-item:hover{ border-color:var(--gold); transform:translateX(2px); }
+  .palette-item .ic{ width:20px; text-align:center; color:var(--gold-deep); font-size:13px; }
+
+  /* ---- Canvas ---- */
+  .canvas-wrap{ overflow-y:auto; padding:32px 40px; }
+  .canvas-inner{ max-width:640px; margin:0 auto; }
+  .form-meta-card{ padding:20px 22px; margin-bottom:22px; }
+  .form-meta-card textarea{ min-height:50px; }
+  #dropZone{ min-height:200px; }
+  .field-card{ background:var(--ivory-panel); border:1px solid var(--gold-line); border-radius:4px; padding:16px 18px; margin-bottom:12px; cursor:pointer; position:relative; transition:.15s; }
+  .field-card.selected{ border-color:var(--gold); box-shadow:0 0 0 3px rgba(201,162,39,0.14); }
+  .field-card.drag-over{ border-top:2px solid var(--gold); }
+  .field-card .fc-head{ display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; }
+  .field-card .fc-type{ font-size:10px; letter-spacing:.08em; text-transform:uppercase; color:var(--gold-deep); font-weight:700; }
+  .field-card .fc-tools{ display:flex; gap:6px; opacity:0; transition:.15s; }
+  .field-card:hover .fc-tools{ opacity:1; }
+  .fc-tools button{ background:none; border:none; cursor:pointer; color:var(--ink-soft); font-size:14px; padding:2px 5px; }
+  .fc-tools button:hover{ color:var(--danger); }
+  .fc-label{ font-weight:600; font-size:14.5px; }
+  .fc-label .req{ color:var(--danger); margin-left:3px; }
+  .fc-preview{ margin-top:8px; pointer-events:none; opacity:.75; }
+  .empty-drop{ text-align:center; padding:60px 20px; color:var(--ink-soft); border:1.5px dashed var(--gold-line); border-radius:6px; font-size:13.5px; }
+
+  /* ---- Inspector ---- */
+  .inspector{ background:var(--creme-deep); border-left:1px solid var(--gold-line); overflow-y:auto; padding:22px 20px; }
+  .inspector h4{ font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:var(--gold-deep); margin-bottom:16px; }
+  .insp-field{ margin-bottom:16px; }
+  .opt-editor-row{ display:flex; gap:6px; margin-bottom:6px; align-items:center; }
+  .opt-editor-row input{ flex:1; padding:8px 10px; font-size:13px; }
+  .opt-editor-row button{ background:none; border:none; color:var(--danger); cursor:pointer; font-size:15px; }
+  .checkbox-line{ display:flex; align-items:center; gap:8px; font-size:13px; margin-bottom:12px; }
+  .no-selection{ color:var(--ink-soft); font-size:13px; text-align:center; padding:40px 10px; }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-left">
+    <img src="assets/logo.png" alt="">
+    <input type="text" id="titleInput" value="Untitled Form">
+    <a href="dashboard.html" class="btn btn-ghost" style="padding:6px 12px; font-size:12px;">← Dashboard</a>
+  </div>
+  <div class="topbar-right">
+    <span id="saveState" style="font-size:11.5px; color:var(--ink-soft);"></span>
+    <div class="status-toggle">
+      Draft
+      <label class="switch"><input type="checkbox" id="publishToggle"><span class="slider-toggle"></span></label>
+      Published
+    </div>
+    <button class="btn btn-ghost" id="previewBtn">Preview</button>
+    <button class="btn btn-gold" id="saveBtn">Save</button>
+  </div>
+</div>
+
+<div class="builder-layout">
+
+  <div class="palette" id="palette">
+    <h4>Fields</h4>
+    <div id="paletteItems"></div>
+  </div>
+
+  <div class="canvas-wrap">
+    <div class="canvas-inner">
+      <div class="panel form-meta-card">
+        <label class="field-label">Form Description</label>
+        <textarea id="descInput" placeholder="Tell people what this form is for…"></textarea>
+        <div class="checkbox-line" style="margin-top:12px;">
+          <input type="checkbox" id="oneSubToggle" checked>
+          <label for="oneSubToggle">Limit to one submission per visitor (browser-based)</label>
+        </div>
+      </div>
+      <div id="dropZone"></div>
+    </div>
+  </div>
+
+  <div class="inspector" id="inspector">
+    <h4>Field Settings</h4>
+    <div id="inspectorBody"><div class="no-selection">Select a field to edit its settings, or drag a new one in from the left.</div></div>
+  </div>
+
+</div>
+
+<script type="module">
+import {
+  auth, db, onAuthStateChanged, signOut, doc, getDoc, updateDoc, toast,
+  getClientIP, isIPAllowed, FIELD_TYPES
+} from './shared/app-core.js';
+
+const urlParams = new URLSearchParams(window.location.search);
+const formId = urlParams.get('id');
+if(!formId){ window.location.href = 'dashboard.html'; }
+
+let currentUser = null;
+let formData = null;
+let selectedFieldId = null;
+
+onAuthStateChanged(auth, async (user)=>{
+  if(!user){ window.location.href='index.html'; return; }
+  const uDoc = await getDoc(doc(db,'users',user.uid));
+  if(!uDoc.exists() || uDoc.data().role !== 'creator' || !uDoc.data().allowedByAdmin){
+    window.location.href='index.html'; return;
+  }
+  const ip = await getClientIP();
+  if(!(await isIPAllowed(ip))){
+    sessionStorage.setItem('__blockedIP', ip || 'unknown');
+    window.location.href='blocked.html'; return;
+  }
+  currentUser = user;
+  await loadForm();
+  renderPalette();
+});
+
+async function loadForm(){
+  const snap = await getDoc(doc(db,'forms',formId));
+  if(!snap.exists() || snap.data().creatorId !== currentUser.uid){
+    toast('Form not found', true); window.location.href='dashboard.html'; return;
+  }
+  formData = snap.data();
+  formData.schema = formData.schema || [];
+  document.getElementById('titleInput').value = formData.title || 'Untitled Form';
+  document.getElementById('descInput').value = formData.description || '';
+  document.getElementById('publishToggle').checked = formData.status === 'published';
+  document.getElementById('oneSubToggle').checked = formData.oneSubmissionPerUser !== false;
+  renderCanvas();
+}
+
+function renderPalette(){
+  const el = document.getElementById('paletteItems');
+  el.innerHTML = FIELD_TYPES.map(f => `
+    <div class="palette-item" draggable="true" data-type="${f.type}">
+      <span class="ic">${f.icon}</span>${f.label}
+    </div>`).join('');
+  el.querySelectorAll('.palette-item').forEach(item=>{
+    item.addEventListener('dragstart', e=>{
+      e.dataTransfer.setData('text/new-field', item.dataset.type);
+    });
+    // Tap-to-add for touch/mobile
+    item.addEventListener('dblclick', ()=> addField(item.dataset.type));
+  });
+}
+
+function newFieldObject(type){
+  const id = 'f_' + Math.random().toString(36).slice(2,10);
+  const base = { id, type, label: labelFor(type), required:false, helpText:'' };
+  if(['dropdown','radio','checkbox'].includes(type)) base.options = ['Option 1','Option 2'];
+  if(type === 'scale') Object.assign(base, { min:1, max:10, step:1, minLabel:'Low', maxLabel:'High' });
+  if(type === 'rating') base.maxStars = 5;
+  if(type === 'nps') base.label = 'How likely are you to recommend us?';
+  if(type === 'matrix') Object.assign(base, { rows:['Row 1','Row 2'], columns:['Column 1','Column 2'] });
+  if(type === 'section') base.label = 'Section Title';
+  if(type === 'image_block') base.mediaUrl = '';
+  if(type === 'page_break') base.label = 'Page Break';
+  base.conditional = null; // { onFieldId, equalsValue }
+  return base;
+}
+
+function labelFor(type){
+  const map = { short_text:'Short answer', long_text:'Your response', email:'Email address', phone:'Phone number',
+    number:'Enter a number', date:'Select a date', time:'Select a time', dropdown:'Choose an option',
+    radio:'Choose one', checkbox:'Select all that apply', tickbox:'I agree', scale:'Rate your experience',
+    rating:'How would you rate this?', ranking:'Rank these items', matrix:'Rate each row', file:'Upload a file',
+    signature:'Sign here', address:'Your address', section:'Section Title', hidden:'hidden_field' };
+  return map[type] || 'Untitled field';
+}
+
+function addField(type, atIndex=null){
+  const f = newFieldObject(type);
+  if(atIndex===null) formData.schema.push(f);
+  else formData.schema.splice(atIndex, 0, f);
+  selectedFieldId = f.id;
+  renderCanvas();
+  markUnsaved();
+}
+
+// ---------- Drop zone: accept new fields from palette ----------
+const dropZone = document.getElementById('dropZone');
+dropZone.addEventListener('dragover', e=> e.preventDefault());
+dropZone.addEventListener('drop', e=>{
+  e.preventDefault();
+  const type = e.dataTransfer.getData('text/new-field');
+  if(type) addField(type);
+});
+
+function renderCanvas(){
+  if(formData.schema.length === 0){
+    dropZone.innerHTML = `<div class="empty-drop">Drag fields here from the left panel, or double-click a field type to add it.</div>`;
+    renderInspector();
+    return;
+  }
+  dropZone.innerHTML = formData.schema.map((f, idx) => fieldCardHTML(f, idx)).join('');
+
+  // selection + reordering
+  dropZone.querySelectorAll('.field-card').forEach(card=>{
+    card.addEventListener('click', ()=>{ selectedFieldId = card.dataset.id; renderCanvas(); });
+    card.setAttribute('draggable','true');
+    card.addEventListener('dragstart', e=>{
+      e.dataTransfer.setData('text/reorder-id', card.dataset.id);
+    });
+    card.addEventListener('dragover', e=>{ e.preventDefault(); card.classList.add('drag-over'); });
+    card.addEventListener('dragleave', ()=> card.classList.remove('drag-over'));
+    card.addEventListener('drop', e=>{
+      e.preventDefault();
+      card.classList.remove('drag-over');
+      const newType = e.dataTransfer.getData('text/new-field');
+      const reorderId = e.dataTransfer.getData('text/reorder-id');
+      const targetIdx = formData.schema.findIndex(x=>x.id===card.dataset.id);
+      if(newType){ addField(newType, targetIdx); return; }
+      if(reorderId && reorderId !== card.dataset.id){
+        const fromIdx = formData.schema.findIndex(x=>x.id===reorderId);
+        const [moved] = formData.schema.splice(fromIdx,1);
+        const insertIdx = formData.schema.findIndex(x=>x.id===card.dataset.id);
+        formData.schema.splice(insertIdx,0,moved);
+        renderCanvas(); markUnsaved();
+      }
+    });
+    card.querySelector('.dup-btn')?.addEventListener('click', e=>{
+      e.stopPropagation();
+      const idx = formData.schema.findIndex(x=>x.id===card.dataset.id);
+      const clone = JSON.parse(JSON.stringify(formData.schema[idx]));
+      clone.id = 'f_' + Math.random().toString(36).slice(2,10);
+      formData.schema.splice(idx+1,0,clone);
+      renderCanvas(); markUnsaved();
+    });
+    card.querySelector('.del-btn')?.addEventListener('click', e=>{
+      e.stopPropagation();
+      formData.schema = formData.schema.filter(x=>x.id!==card.dataset.id);
+      if(selectedFieldId===card.dataset.id) selectedFieldId=null;
+      renderCanvas(); markUnsaved();
+    });
+  });
+
+  renderInspector();
+}
+
+function fieldCardHTML(f, idx){
+  const typeLabel = FIELD_TYPES.find(t=>t.type===f.type)?.label || f.type;
+  return `
+  <div class="field-card ${selectedFieldId===f.id?'selected':''}" data-id="${f.id}">
+    <div class="fc-head">
+      <span class="fc-type">${typeLabel}${f.conditional ? ' · conditional' : ''}</span>
+      <div class="fc-tools">
+        <button class="dup-btn" title="Duplicate">⧉</button>
+        <button class="del-btn" title="Delete">✕</button>
+      </div>
+    </div>
+    <div class="fc-label">${escapeHTML(f.label)}${f.required ? '<span class="req">*</span>' : ''}</div>
+    <div class="fc-preview">${miniPreview(f)}</div>
+  </div>`;
+}
+
+function miniPreview(f){
+  switch(f.type){
+    case 'short_text': return `<input type="text" disabled placeholder="Short answer text">`;
+    case 'long_text': return `<textarea disabled placeholder="Long answer text" style="min-height:50px;"></textarea>`;
+    case 'email': return `<input type="text" disabled placeholder="name@example.com">`;
+    case 'phone': return `<input type="text" disabled placeholder="+91 00000 00000">`;
+    case 'number': return `<input type="text" disabled placeholder="0">`;
+    case 'date': return `<input type="text" disabled placeholder="DD / MM / YYYY">`;
+    case 'time': return `<input type="text" disabled placeholder="--:--">`;
+    case 'dropdown': return `<select disabled><option>${(f.options||[]).join('</option><option>')}</option></select>`;
+    case 'radio': return (f.options||[]).map(o=>`<div class="opt-row"><input type="radio" disabled><span style="font-size:13px;">${escapeHTML(o)}</span></div>`).join('');
+    case 'checkbox': return (f.options||[]).map(o=>`<div class="opt-row"><input type="checkbox" disabled><span style="font-size:13px;">${escapeHTML(o)}</span></div>`).join('');
+    case 'tickbox': return `<div class="opt-row"><input type="checkbox" disabled><span style="font-size:13px;">${escapeHTML(f.label)}</span></div>`;
+    case 'scale': return `<div style="font-size:12px; display:flex; justify-content:space-between;"><span>${f.minLabel}</span><span>${f.maxLabel}</span></div><input type="range" disabled>`;
+    case 'rating': return `<div style="font-size:16px; color:var(--gold);">${'★'.repeat(f.maxStars||5)}</div>`;
+    case 'nps': return `<div style="display:flex; gap:4px; font-size:11px;">${Array.from({length:11},(_,i)=>`<span style="border:1px solid var(--gold-line); padding:3px 6px; border-radius:3px;">${i}</span>`).join('')}</div>`;
+    case 'ranking': return (f.options||['Item 1','Item 2']).map(o=>`<div style="border:1px solid var(--gold-line); padding:6px 10px; margin-bottom:4px; border-radius:3px; font-size:13px;">☰ ${escapeHTML(o)}</div>`).join('');
+    case 'matrix': return `<div style="font-size:11.5px; color:var(--ink-soft);">${(f.rows||[]).length} rows × ${(f.columns||[]).length} columns</div>`;
+    case 'file': return `<div style="border:1.5px dashed var(--gold-line); padding:14px; text-align:center; font-size:12.5px; border-radius:4px;">⇧ Click or drag file to upload</div>`;
+    case 'signature': return `<div style="border:1.5px dashed var(--gold-line); height:60px; border-radius:4px; display:flex; align-items:center; justify-content:center; font-size:12px; color:var(--ink-soft);">Signature pad</div>`;
+    case 'address': return `<input type="text" disabled placeholder="Street, City, State, PIN">`;
+    case 'section': return `<div class="wing-rule"><span class="diamond"></span></div>`;
+    case 'page_break': return `<div style="font-size:11.5px; color:var(--ink-soft); text-align:center;">— new page starts below —</div>`;
+    case 'image_block': return f.mediaUrl ? `<img src="${f.mediaUrl}" style="max-width:100%; border-radius:4px;">` : `<div style="font-size:12px; color:var(--ink-soft);">No media URL set</div>`;
+    case 'hidden': return `<div style="font-size:11.5px; color:var(--ink-soft);">Hidden — not shown to respondents</div>`;
+    default: return '';
+  }
+}
+
+// ---------- Inspector ----------
+function renderInspector(){
+  const body = document.getElementById('inspectorBody');
+  if(!selectedFieldId){ body.innerHTML = `<div class="no-selection">Select a field to edit its settings, or drag a new one in from the left.</div>`; return; }
+  const f = formData.schema.find(x=>x.id===selectedFieldId);
+  if(!f){ body.innerHTML = `<div class="no-selection">Select a field.</div>`; return; }
+
+  let html = `
+    <div class="insp-field">
+      <label class="field-label">Label</label>
+      <input type="text" id="i_label" value="${escapeAttr(f.label)}">
+    </div>`;
+
+  if(f.type !== 'section' && f.type !== 'page_break'){
+    html += `
+    <div class="insp-field">
+      <label class="field-label">Help Text</label>
+      <input type="text" id="i_help" value="${escapeAttr(f.helpText||'')}" placeholder="Optional guidance text">
+    </div>
+    <div class="checkbox-line">
+      <input type="checkbox" id="i_required" ${f.required?'checked':''}>
+      <label for="i_required">Required field</label>
+    </div>`;
+  }
+
+  if(['dropdown','radio','checkbox','ranking'].includes(f.type)){
+    html += `<div class="insp-field"><label class="field-label">Options</label><div id="optList"></div>
+      <button class="btn btn-ghost" id="addOptBtn" style="margin-top:6px; padding:7px 12px; font-size:12px;">+ Add option</button></div>`;
+  }
+
+  if(f.type === 'scale'){
+    html += `
+    <div class="insp-field"><label class="field-label">Min value</label><input type="number" id="i_min" value="${f.min}"></div>
+    <div class="insp-field"><label class="field-label">Max value</label><input type="number" id="i_max" value="${f.max}"></div>
+    <div class="insp-field"><label class="field-label">Min label</label><input type="text" id="i_minLabel" value="${escapeAttr(f.minLabel)}"></div>
+    <div class="insp-field"><label class="field-label">Max label</label><input type="text" id="i_maxLabel" value="${escapeAttr(f.maxLabel)}"></div>`;
+  }
+  if(f.type === 'rating'){
+    html += `<div class="insp-field"><label class="field-label">Number of stars</label><input type="number" id="i_maxStars" value="${f.maxStars}" min="3" max="10"></div>`;
+  }
+  if(f.type === 'matrix'){
+    html += `<div class="insp-field"><label class="field-label">Rows (one per line)</label><textarea id="i_rows">${(f.rows||[]).join('\n')}</textarea></div>
+    <div class="insp-field"><label class="field-label">Columns (one per line)</label><textarea id="i_cols">${(f.columns||[]).join('\n')}</textarea></div>`;
+  }
+  if(f.type === 'image_block'){
+    html += `<div class="insp-field"><label class="field-label">Media URL</label><input type="text" id="i_mediaUrl" value="${escapeAttr(f.mediaUrl||'')}" placeholder="https://…"></div>`;
+  }
+
+  // Conditional logic
+  const otherFields = formData.schema.filter(x=> x.id!==f.id && ['dropdown','radio','tickbox','checkbox'].includes(x.type));
+  html += `<div class="insp-field"><label class="field-label">Show this field only if…</label>
+    <select id="i_condField"><option value="">Always show</option>
+    ${otherFields.map(o=>`<option value="${o.id}" ${f.conditional?.onFieldId===o.id?'selected':''}>${escapeHTML(o.label)}</option>`).join('')}
+    </select></div>`;
+  if(otherFields.length){
+    html += `<div class="insp-field" id="condValueWrap" style="${f.conditional?'':'display:none;'}">
+      <label class="field-label">…equals</label>
+      <input type="text" id="i_condValue" value="${escapeAttr(f.conditional?.equalsValue||'')}" placeholder="Exact option text or 'checked'">
+    </div>`;
+  }
+
+  body.innerHTML = html;
+
+  document.getElementById('i_label').addEventListener('input', e=>{ f.label = e.target.value; markUnsaved(); renderCanvasFieldOnly(f); });
+  document.getElementById('i_help')?.addEventListener('input', e=>{ f.helpText = e.target.value; markUnsaved(); });
+  document.getElementById('i_required')?.addEventListener('change', e=>{ f.required = e.target.checked; markUnsaved(); renderCanvasFieldOnly(f); });
+
+  if(['dropdown','radio','checkbox','ranking'].includes(f.type)) renderOptionEditor(f);
+
+  document.getElementById('i_min')?.addEventListener('input', e=>{ f.min = Number(e.target.value); markUnsaved(); });
+  document.getElementById('i_max')?.addEventListener('input', e=>{ f.max = Number(e.target.value); markUnsaved(); });
+  document.getElementById('i_minLabel')?.addEventListener('input', e=>{ f.minLabel = e.target.value; markUnsaved(); });
+  document.getElementById('i_maxLabel')?.addEventListener('input', e=>{ f.maxLabel = e.target.value; markUnsaved(); });
+  document.getElementById('i_maxStars')?.addEventListener('input', e=>{ f.maxStars = Number(e.target.value); markUnsaved(); renderCanvas(); });
+  document.getElementById('i_rows')?.addEventListener('input', e=>{ f.rows = e.target.value.split('\n').filter(Boolean); markUnsaved(); });
+  document.getElementById('i_cols')?.addEventListener('input', e=>{ f.columns = e.target.value.split('\n').filter(Boolean); markUnsaved(); });
+  document.getElementById('i_mediaUrl')?.addEventListener('input', e=>{ f.mediaUrl = e.target.value; markUnsaved(); renderCanvas(); });
+
+  document.getElementById('i_condField')?.addEventListener('change', e=>{
+    if(!e.target.value){ f.conditional = null; }
+    else { f.conditional = { onFieldId:e.target.value, equalsValue: f.conditional?.equalsValue || '' }; }
+    markUnsaved(); renderCanvas();
+  });
+  document.getElementById('i_condValue')?.addEventListener('input', e=>{
+    if(f.conditional) f.conditional.equalsValue = e.target.value;
+    markUnsaved();
+  });
+}
+
+function renderOptionEditor(f){
+  const wrap = document.getElementById('optList');
+  wrap.innerHTML = (f.options||[]).map((o,i)=>`
+    <div class="opt-editor-row">
+      <input type="text" value="${escapeAttr(o)}" data-idx="${i}">
+      <button data-idx="${i}" class="rm-opt">✕</button>
+    </div>`).join('');
+  wrap.querySelectorAll('input').forEach(inp=>{
+    inp.addEventListener('input', e=>{ f.options[Number(e.target.dataset.idx)] = e.target.value; markUnsaved(); renderCanvasFieldOnly(f); });
+  });
+  wrap.querySelectorAll('.rm-opt').forEach(btn=>{
+    btn.addEventListener('click', e=>{
+      f.options.splice(Number(e.target.dataset.idx),1);
+      markUnsaved(); renderInspector(); renderCanvasFieldOnly(f);
+    });
+  });
+  document.getElementById('addOptBtn').onclick = ()=>{
+    f.options.push(`Option ${f.options.length+1}`);
+    markUnsaved(); renderInspector(); renderCanvasFieldOnly(f);
+  };
+}
+
+function renderCanvasFieldOnly(f){
+  const card = dropZone.querySelector(`.field-card[data-id="${f.id}"]`);
+  if(card) card.outerHTML = fieldCardHTML(f, formData.schema.indexOf(f));
+  // re-bind since outerHTML replaced node — simplest is full re-render for correctness
+  renderCanvas();
+}
+
+// ---------- Save / Publish ----------
+let unsavedTimer = null;
+function markUnsaved(){
+  document.getElementById('saveState').textContent = 'Unsaved changes';
+  clearTimeout(unsavedTimer);
+}
+
+document.getElementById('titleInput').addEventListener('input', e=>{ formData.title = e.target.value; markUnsaved(); });
+document.getElementById('descInput').addEventListener('input', e=>{ formData.description = e.target.value; markUnsaved(); });
+document.getElementById('oneSubToggle').addEventListener('change', e=>{ formData.oneSubmissionPerUser = e.target.checked; markUnsaved(); });
+document.getElementById('publishToggle').addEventListener('change', e=>{ formData.status = e.target.checked ? 'published' : 'draft'; markUnsaved(); });
+
+document.getElementById('saveBtn').addEventListener('click', saveForm);
+document.getElementById('previewBtn').addEventListener('click', ()=>{
+  // Preview uses the internal formId via an auth-gated lookup, not the public slug —
+  // this lets you preview a draft before it's published.
+  window.open(`f.html?fid=${formId}&preview=1`, '_blank');
+});
+
+async function saveForm(){
+  document.getElementById('saveState').textContent = 'Saving…';
+  await updateDoc(doc(db,'forms',formId), {
+    title: formData.title,
+    description: formData.description,
+    schema: formData.schema,
+    status: formData.status,
+    oneSubmissionPerUser: formData.oneSubmissionPerUser
+  });
+  document.getElementById('saveState').textContent = 'Saved ✓';
+  toast('Form saved');
+  setTimeout(()=> document.getElementById('saveState').textContent = '', 2500);
+}
+
+function escapeHTML(s){ return (s||'').replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+function escapeAttr(s){ return escapeHTML(s).replace(/\n/g,'&#10;'); }
+</script>
+</body>
+</html>

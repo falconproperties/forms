@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Access Restricted — Forms by Falcon Properties</title>
+<link rel="icon" href="assets/logo.png">
+<link rel="stylesheet" href="shared/styles.css">
+<style>
+  .wrap{ max-width:420px; padding:20px; text-align:center; }
+  .wrap img{ width:60px; margin-bottom:18px; opacity:.85; }
+  .wrap h2{ font-size:20px; margin-bottom:10px; }
+  .wrap p{ color:var(--ink-soft); font-size:14px; line-height:1.6; }
+  .ip-tag{ display:inline-block; margin-top:16px; font-family:monospace; font-size:12.5px; background:var(--creme-deep); border:1px solid var(--gold-line); padding:8px 14px; border-radius:var(--radius); }
+</style>
+</head>
+<body>
+<div class="center-screen">
+  <div class="wrap panel" style="padding:40px 34px;">
+    <img src="assets/logo.png" alt="">
+    <h2>Access Restricted</h2>
+    <p>This page is only reachable from IP addresses whitelisted by the Super Admin. If you believe this is a mistake, contact your administrator to have your current IP address added.</p>
+    <div class="ip-tag" id="ipTag">—</div>
+    <div style="margin-top:26px;"><a href="index.html" class="btn btn-ghost">← Back</a></div>
+  </div>
+</div>
+<script>
+  document.getElementById('ipTag').textContent = sessionStorage.getItem('__blockedIP') || 'unknown';
+</script>
+</body>
+</html>

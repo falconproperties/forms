@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Super Admin — Forms by Falcon Properties</title>
+<link rel="icon" href="assets/logo.png">
+<link rel="stylesheet" href="shared/styles.css">
+<style>
+  body{ background:var(--ink); }
+  .wrap{ width:100%; max-width:380px; padding:20px; }
+  .logo-badge{ display:flex; flex-direction:column; align-items:center; margin-bottom:26px; }
+  .logo-badge img{ width:64px; height:auto; margin-bottom:10px; filter:drop-shadow(0 6px 14px rgba(201,162,39,.35)); }
+  .logo-badge .brand{ font-family:'Fraunces',serif; font-weight:700; font-size:19px; color:var(--creme); }
+  .logo-badge .tag{ font-size:10.5px; letter-spacing:.2em; text-transform:uppercase; color:var(--gold); margin-top:5px; }
+  .card{ padding:32px 30px; background:#2A2315; border-color:var(--gold-line); }
+  .card h2{ color:var(--creme); font-size:18px; margin-bottom:20px; }
+  .card .field-label{ color:#C9C0A6; }
+  .row-gap{ margin-bottom:16px; }
+  input{ background:#332B18 !important; color:var(--creme) !important; border-color:var(--gold-line) !important; }
+  input::placeholder{ color:#8A8062 !important; }
+  .back-link{ text-align:center; margin-top:22px; }
+  .back-link a{ font-size:11.5px; letter-spacing:.08em; text-transform:uppercase; color:#8A8062; text-decoration:none; }
+  .back-link a:hover{ color:var(--gold); }
+  .warn{ font-size:11.5px; color:#8A8062; text-align:center; margin-top:14px; line-height:1.5; }
+</style>
+</head>
+<body>
+<div class="center-screen">
+  <div class="wrap">
+    <div class="logo-badge">
+      <img src="assets/logo.png" alt="Falcon Properties">
+      <div class="brand">Forms by Falcon Properties</div>
+      <div class="tag">Super Admin</div>
+    </div>
+
+    <div class="panel card">
+      <div class="wing-rule" style="margin-bottom:20px;"><span class="diamond"></span></div>
+      <h2>Super Admin Sign In</h2>
+      <form id="authForm">
+        <div class="row-gap">
+          <label class="field-label">Email</label>
+          <input type="email" id="email" required placeholder="superadmin@falconproperties.com">
+        </div>
+        <div class="row-gap">
+          <label class="field-label">Password</label>
+          <input type="password" id="password" required placeholder="••••••••">
+        </div>
+        <button type="submit" class="btn btn-gold btn-block" id="submitBtn">Sign In</button>
+      </form>
+      <div class="warn">Accounts are provisioned manually in Firebase. There is no self-signup for Super Admin.</div>
+    </div>
+
+    <div class="back-link"><a href="index.html">← Back to creator sign in</a></div>
+  </div>
+</div>
+
+<script type="module">
+import {
+  auth, db, signInWithEmailAndPassword, doc, getDoc, toast, getClientIP, isIPAllowed
+} from './shared/app-core.js';
+
+document.getElementById('authForm').addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  const email = document.getElementById('email').value.trim();
+  const password = document.getElementById('password').value;
+  const submitBtn = document.getElementById('submitBtn');
+  submitBtn.disabled = true;
+
+  try{
+    const cred = await signInWithEmailAndPassword(auth, email, password);
+    const userDoc = await getDoc(doc(db, 'users', cred.user.uid));
+
+    if(!userDoc.exists() || userDoc.data().role !== 'superadmin'){
+      toast('This account does not have super admin privileges', true);
+      await auth.signOut(); submitBtn.disabled = false; return;
+    }
+
+    // Super admin's own IP must ALSO be whitelisted (bootstrap this manually the first time — see README)
+    const ip = await getClientIP();
+    const allowed = await isIPAllowed(ip);
+    if(!allowed){
+      toast('Access denied: your IP address is not whitelisted', true);
+      await auth.signOut(); submitBtn.disabled = false; return;
+    }
+
+    toast('Welcome, Super Admin');
+    window.location.href = 'admin-panel.html';
+
+  }catch(err){
+    console.error(err);
+    toast('Incorrect email or password', true);
+  }
+  submitBtn.disabled = false;
+});
+</script>
+</body>
+</html>

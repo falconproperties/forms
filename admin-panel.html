@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Super Admin Panel — Forms by Falcon Properties</title>
+<link rel="icon" href="assets/logo.png">
+<link rel="stylesheet" href="shared/styles.css">
+<style>
+  .topbar{ background:var(--ink); border-bottom:1px solid var(--gold-line); padding:16px 0; }
+  .topbar .container{ display:flex; align-items:center; justify-content:space-between; }
+  .brand-mini{ display:flex; align-items:center; gap:10px; }
+  .brand-mini img{ width:30px; }
+  .brand-mini span{ font-family:'Fraunces',serif; color:var(--creme); font-weight:700; font-size:15px; }
+  .brand-mini small{ display:block; color:var(--gold); font-size:9.5px; letter-spacing:.18em; text-transform:uppercase; }
+
+  .main{ padding:36px 0 60px; }
+  .grid{ display:grid; grid-template-columns:1.1fr 1fr; gap:26px; }
+  @media(max-width:900px){ .grid{ grid-template-columns:1fr; } }
+
+  .section-title{ display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; }
+  .card{ padding:22px 22px 8px; }
+  .list-row{ display:flex; align-items:center; justify-content:space-between; gap:12px; padding:13px 0; border-bottom:1px solid var(--gold-line); }
+  .list-row:last-child{ border-bottom:none; }
+  .list-row .meta{ display:flex; flex-direction:column; }
+  .list-row .meta .primary{ font-weight:600; font-size:14px; }
+  .list-row .meta .secondary{ font-size:11.5px; color:var(--ink-soft); margin-top:2px; }
+  .pill{ font-size:10px; letter-spacing:.08em; text-transform:uppercase; padding:4px 9px; border-radius:20px; font-weight:700; }
+  .pill.pending{ background:#F1E2C4; color:#8A5A0B; }
+  .pill.approved{ background:#E1EDE4; color:var(--success); }
+  .row-actions{ display:flex; gap:8px; }
+  .row-actions .btn{ padding:7px 12px; font-size:11.5px; }
+
+  .add-ip-row{ display:flex; gap:10px; margin-bottom:18px; }
+  .add-ip-row input{ flex:1; }
+
+  .stat-strip{ display:flex; gap:16px; margin-bottom:28px; flex-wrap:wrap; }
+  .stat{ flex:1; min-width:140px; padding:18px 20px; }
+  .stat .num{ font-family:'Fraunces',serif; font-size:28px; font-weight:700; }
+  .stat .lbl{ font-size:11.5px; color:var(--ink-soft); margin-top:4px; }
+  .empty{ color:var(--ink-soft); font-size:13px; padding:20px 0; text-align:center; }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="container">
+    <div class="brand-mini">
+      <img src="assets/logo.png" alt="">
+      <div><span>Forms by Falcon Properties</span><small>Super Admin</small></div>
+    </div>
+    <button class="btn btn-ghost" id="logoutBtn" style="color:var(--creme); border-color:var(--gold-line);">Sign Out</button>
+  </div>
+</div>
+
+<div class="main container">
+
+  <div class="stat-strip">
+    <div class="panel stat"><div class="num" id="statCreators">—</div><div class="lbl">Approved Creators</div></div>
+    <div class="panel stat"><div class="num" id="statPending">—</div><div class="lbl">Pending Approval</div></div>
+    <div class="panel stat"><div class="num" id="statIPs">—</div><div class="lbl">Whitelisted IPs</div></div>
+    <div class="panel stat"><div class="num" id="statForms">—</div><div class="lbl">Forms Published</div></div>
+  </div>
+
+  <div class="grid">
+    <div>
+      <div class="section-title"><h3 style="font-size:16px;">Creator Accounts</h3></div>
+      <div class="panel card">
+        <div id="creatorList"><div class="empty">Loading…</div></div>
+      </div>
+    </div>
+
+    <div>
+      <div class="section-title"><h3 style="font-size:16px;">IP Whitelist</h3></div>
+      <div class="panel card">
+        <div class="add-ip-row">
+          <input type="text" id="newIP" placeholder="e.g. 49.204.xxx.xxx">
+          <button class="btn btn-gold" id="addIPBtn">Add</button>
+        </div>
+        <div id="ipList"><div class="empty">Loading…</div></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script type="module">
+import {
+  auth, db, onAuthStateChanged, signOut, doc, getDoc, setDoc, updateDoc, deleteDoc,
+  collection, getDocs, query, where, toast, getClientIP, isIPAllowed
+} from './shared/app-core.js';
+
+document.getElementById('logoutBtn').addEventListener('click', async ()=>{ await signOut(auth); window.location.href='superadmin.html'; });
+
+onAuthStateChanged(auth, async (user)=>{
+  if(!user){ window.location.href='superadmin.html'; return; }
+  const uDoc = await getDoc(doc(db,'users',user.uid));
+  if(!uDoc.exists() || uDoc.data().role !== 'superadmin'){
+    toast('Not authorized', true);
+    window.location.href='superadmin.html'; return;
+  }
+  const ip = await getClientIP();
+  if(!(await isIPAllowed(ip))){
+    sessionStorage.setItem('__blockedIP', ip || 'unknown');
+    window.location.href='blocked.html'; return;
+  }
+  loadCreators();
+  loadIPs();
+  loadFormCount();
+});
+
+async function loadCreators(){
+  const snap = await getDocs(query(collection(db,'users'), where('role','==','creator')));
+  const list = document.getElementById('creatorList');
+  if(snap.empty){ list.innerHTML = '<div class="empty">No creator accounts yet.</div>'; return; }
+
+  let approved=0, pending=0, html='';
+  snap.forEach(d=>{
+    const u = d.data();
+    if(u.allowedByAdmin) approved++; else pending++;
+    html += `
+      <div class="list-row" data-uid="${d.id}">
+        <div class="meta">
+          <span class="primary">${u.email}</span>
+          <span class="secondary">${u.allowedByAdmin ? 'Approved' : 'Awaiting approval'}</span>
+        </div>
+        <div class="row-actions">
+          <span class="pill ${u.allowedByAdmin?'approved':'pending'}">${u.allowedByAdmin?'Active':'Pending'}</span>
+          ${u.allowedByAdmin
+            ? `<button class="btn btn-danger revoke-btn">Revoke</button>`
+            : `<button class="btn btn-gold approve-btn">Approve</button>`}
+        </div>
+      </div>`;
+  });
+  list.innerHTML = html;
+  document.getElementById('statCreators').textContent = approved;
+  document.getElementById('statPending').textContent = pending;
+
+  list.querySelectorAll('.approve-btn').forEach(btn=>{
+    btn.addEventListener('click', async (e)=>{
+      const uid = e.target.closest('.list-row').dataset.uid;
+      await updateDoc(doc(db,'users',uid), { allowedByAdmin:true });
+      toast('Creator approved'); loadCreators();
+    });
+  });
+  list.querySelectorAll('.revoke-btn').forEach(btn=>{
+    btn.addEventListener('click', async (e)=>{
+      const uid = e.target.closest('.list-row').dataset.uid;
+      await updateDoc(doc(db,'users',uid), { allowedByAdmin:false });
+      toast('Access revoked'); loadCreators();
+    });
+  });
+}
+
+async function loadIPs(){
+  const snap = await getDocs(collection(db,'ipWhitelist'));
+  const list = document.getElementById('ipList');
+  if(snap.empty){ list.innerHTML = '<div class="empty">No IPs whitelisted yet.</div>'; document.getElementById('statIPs').textContent = 0; return; }
+
+  let html=''; let count=0;
+  snap.forEach(d=>{
+    const data = d.data();
+    if(data.active) count++;
+    html += `
+      <div class="list-row" data-ip="${d.id}">
+        <div class="meta">
+          <span class="primary" style="font-family:monospace;">${d.id}</span>
+          <span class="secondary">${data.note || 'No note'}</span>
+        </div>
+        <div class="row-actions">
+          <span class="pill ${data.active?'approved':'pending'}">${data.active?'Active':'Disabled'}</span>
+          <button class="btn btn-ghost toggle-ip-btn">${data.active?'Disable':'Enable'}</button>
+          <button class="btn btn-danger del-ip-btn">Remove</button>
+        </div>
+      </div>`;
+  });
+  list.innerHTML = html;
+  document.getElementById('statIPs').textContent = count;
+
+  list.querySelectorAll('.toggle-ip-btn').forEach(btn=>{
+    btn.addEventListener('click', async (e)=>{
+      const ip = e.target.closest('.list-row').dataset.ip;
+      const snap = await getDoc(doc(db,'ipWhitelist',ip));
+      await updateDoc(doc(db,'ipWhitelist',ip), { active: !snap.data().active });
+      loadIPs();
+    });
+  });
+  list.querySelectorAll('.del-ip-btn').forEach(btn=>{
+    btn.addEventListener('click', async (e)=>{
+      const ip = e.target.closest('.list-row').dataset.ip;
+      if(!confirm(`Remove ${ip} from the whitelist?`)) return;
+      await deleteDoc(doc(db,'ipWhitelist',ip));
+      toast('IP removed'); loadIPs();
+    });
+  });
+}
+
+document.getElementById('addIPBtn').addEventListener('click', async ()=>{
+  const ipInput = document.getElementById('newIP');
+  const ip = ipInput.value.trim();
+  if(!ip){ toast('Enter an IP address', true); return; }
+  await setDoc(doc(db,'ipWhitelist',ip), { active:true, note:'Added manually', addedAt: new Date().toISOString() });
+  ipInput.value='';
+  toast('IP whitelisted'); loadIPs();
+});
+
+async function loadFormCount(){
+  const snap = await getDocs(collection(db,'forms'));
+  document.getElementById('statForms').textContent = snap.size;
+}
+</script>
+</body>
+</html>

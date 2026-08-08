@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Forms by Falcon Properties — Creator Login</title>
+<link rel="icon" href="assets/logo.png">
+<link rel="stylesheet" href="shared/styles.css">
+<style>
+  .wrap{ width:100%; max-width:400px; padding:20px; }
+  .logo-badge{ display:flex; flex-direction:column; align-items:center; margin-bottom:26px; }
+  .logo-badge img{ width:76px; height:auto; margin-bottom:10px; filter:drop-shadow(0 6px 14px rgba(201,162,39,.35)); }
+  .logo-badge .brand{ font-family:'Fraunces',serif; font-weight:700; font-size:22px; letter-spacing:.01em; }
+  .logo-badge .tag{ font-size:11px; letter-spacing:.18em; text-transform:uppercase; color:var(--gold-deep); margin-top:4px; }
+  .card{ padding:34px 32px 30px; }
+  .row-gap{ margin-bottom:16px; }
+  .toggle-line{ text-align:center; margin-top:18px; font-size:13px; color:var(--ink-soft); }
+  .toggle-line a{ color:var(--gold-deep); font-weight:600; text-decoration:none; cursor:pointer; }
+  .toggle-line a:hover{ text-decoration:underline; }
+  .super-link{ text-align:center; margin-top:26px; }
+  .super-link a{ font-size:11.5px; letter-spacing:.08em; text-transform:uppercase; color:var(--ink-soft); text-decoration:none; }
+  .super-link a:hover{ color:var(--gold-deep); }
+  .pending-note{ background:var(--creme-deep); border:1px solid var(--gold-line); border-radius:var(--radius); padding:14px 16px; font-size:12.5px; color:var(--ink-soft); margin-top:16px; line-height:1.5; display:none; }
+</style>
+</head>
+<body>
+<div class="center-screen">
+  <div class="wrap">
+    <div class="logo-badge">
+      <img src="assets/logo.png" alt="Falcon Properties">
+      <div class="brand">Forms by Falcon Properties</div>
+      <div class="tag">Key to your dream</div>
+    </div>
+
+    <div class="panel card seal">
+      <div class="wing-rule" style="margin-bottom:22px;"><span class="diamond"></span></div>
+      <h2 id="formTitle" style="font-size:20px; margin-bottom:22px;">Creator Sign In</h2>
+
+      <form id="authForm">
+        <div class="row-gap">
+          <label class="field-label">Email</label>
+          <input type="email" id="email" required placeholder="you@falconproperties.com">
+        </div>
+        <div class="row-gap">
+          <label class="field-label">Password</label>
+          <input type="password" id="password" required placeholder="••••••••" minlength="6">
+        </div>
+        <button type="submit" class="btn btn-gold btn-block" id="submitBtn">Sign In</button>
+      </form>
+
+      <div class="pending-note" id="pendingNote">
+        Your request has been submitted. A super admin needs to approve your account and whitelist your IP address before you can sign in.
+      </div>
+
+      <div class="toggle-line" id="toggleLine">
+        New creator? <a id="toggleMode">Request access</a>
+      </div>
+    </div>
+
+    <div class="super-link"><a href="superadmin.html">Super Admin Access →</a></div>
+  </div>
+</div>
+
+<script type="module">
+import {
+  auth, db, signInWithEmailAndPassword, createUserWithEmailAndPassword,
+  doc, getDoc, setDoc, serverTimestamp, toast, getClientIP, isIPAllowed
+} from './shared/app-core.js';
+
+let mode = 'login'; // or 'signup'
+const formTitle = document.getElementById('formTitle');
+const toggleLine = document.getElementById('toggleLine');
+const toggleMode = document.getElementById('toggleMode');
+const submitBtn = document.getElementById('submitBtn');
+const pendingNote = document.getElementById('pendingNote');
+
+toggleMode.addEventListener('click', ()=>{
+  mode = mode === 'login' ? 'signup' : 'login';
+  formTitle.textContent = mode === 'login' ? 'Creator Sign In' : 'Request Creator Access';
+  submitBtn.textContent = mode === 'login' ? 'Sign In' : 'Request Access';
+  toggleLine.innerHTML = mode === 'login'
+    ? 'New creator? <a id="toggleMode">Request access</a>'
+    : 'Already approved? <a id="toggleMode">Sign in</a>';
+  document.getElementById('toggleMode').addEventListener('click', arguments.callee);
+  pendingNote.style.display = 'none';
+});
+
+document.getElementById('authForm').addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  const email = document.getElementById('email').value.trim();
+  const password = document.getElementById('password').value;
+  submitBtn.disabled = true;
+
+  try{
+    if(mode === 'signup'){
+      const cred = await createUserWithEmailAndPassword(auth, email, password);
+      await setDoc(doc(db, 'users', cred.user.uid), {
+        email, role:'creator', allowedByAdmin:false, createdAt: serverTimestamp()
+      });
+      pendingNote.style.display = 'block';
+      toast('Access request submitted');
+      submitBtn.disabled = false;
+      return;
+    }
+
+    // ---- LOGIN FLOW ----
+    const cred = await signInWithEmailAndPassword(auth, email, password);
+    const userDoc = await getDoc(doc(db, 'users', cred.user.uid));
+
+    if(!userDoc.exists() || userDoc.data().role !== 'creator'){
+      toast('Account not recognized as a creator', true);
+      await auth.signOut(); submitBtn.disabled = false; return;
+    }
+    if(!userDoc.data().allowedByAdmin){
+      toast('Your account is awaiting super admin approval', true);
+      await auth.signOut(); submitBtn.disabled = false; return;
+    }
+
+    // IP check
+    const ip = await getClientIP();
+    const allowed = await isIPAllowed(ip);
+    if(!allowed){
+      toast('Access denied: your IP address is not whitelisted', true);
+      await auth.signOut(); submitBtn.disabled = false; return;
+    }
+
+    toast('Welcome back');
+    window.location.href = 'dashboard.html';
+
+  }catch(err){
+    console.error(err);
+    let msg = 'Something went wrong';
+    if(err.code === 'auth/invalid-credential' || err.code === 'auth/wrong-password') msg = 'Incorrect email or password';
+    if(err.code === 'auth/email-already-in-use') msg = 'An account already exists for this email';
+    if(err.code === 'auth/weak-password') msg = 'Password must be at least 6 characters';
+    if(err.code === 'auth/user-not-found') msg = 'No account found for this email';
+    toast(msg, true);
+  }
+  submitBtn.disabled = false;
+});
+</script>
+</body>
+</html>

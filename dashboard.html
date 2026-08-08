@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard — Forms by Falcon Properties</title>
+<link rel="icon" href="assets/logo.png">
+<link rel="stylesheet" href="shared/styles.css">
+<style>
+  .topbar{ background:var(--ivory-panel); border-bottom:1px solid var(--gold-line); padding:16px 0; position:sticky; top:0; z-index:50; }
+  .topbar .container{ display:flex; align-items:center; justify-content:space-between; }
+  .brand-mini{ display:flex; align-items:center; gap:10px; }
+  .brand-mini img{ width:32px; }
+  .brand-mini span{ font-family:'Fraunces',serif; font-weight:700; font-size:16px; }
+  .brand-mini small{ display:block; color:var(--gold-deep); font-size:9.5px; letter-spacing:.18em; text-transform:uppercase; }
+
+  .main{ padding:38px 0 70px; }
+  .page-head{ display:flex; align-items:flex-end; justify-content:space-between; margin-bottom:30px; flex-wrap:wrap; gap:14px;}
+  .page-head h1{ font-size:28px; }
+  .form-grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(300px,1fr)); gap:20px; }
+  .form-card{ padding:22px; display:flex; flex-direction:column; gap:10px; transition:transform .2s var(--ease), box-shadow .2s var(--ease); }
+  .form-card:hover{ transform:translateY(-2px); }
+  .form-card .fc-title{ font-family:'Fraunces',serif; font-weight:700; font-size:17px; }
+  .form-card .fc-meta{ font-size:12px; color:var(--ink-soft); display:flex; gap:10px; align-items:center; }
+  .status-dot{ width:7px; height:7px; border-radius:50%; display:inline-block; }
+  .status-dot.published{ background:var(--success); }
+  .status-dot.draft{ background:#B8AE94; }
+  .fc-actions{ display:flex; gap:8px; margin-top:8px; flex-wrap:wrap; }
+  .fc-actions .btn{ padding:8px 13px; font-size:12px; }
+  .empty-state{ text-align:center; padding:80px 20px; color:var(--ink-soft); }
+  .empty-state img{ width:50px; opacity:.5; margin-bottom:16px; }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="container">
+    <div class="brand-mini">
+      <img src="assets/logo.png" alt="">
+      <div><span>Forms by Falcon Properties</span><small id="userEmail">Creator</small></div>
+    </div>
+    <button class="btn btn-ghost" id="logoutBtn">Sign Out</button>
+  </div>
+</div>
+
+<div class="main container">
+  <div class="page-head">
+    <div>
+      <div class="eyebrow">Your Workspace</div>
+      <h1>Forms</h1>
+    </div>
+    <button class="btn btn-gold" id="newFormBtn">+ New Form</button>
+  </div>
+
+  <div id="formGrid" class="form-grid"><div class="falcon-loader"></div></div>
+</div>
+
+<script type="module">
+import {
+  auth, db, onAuthStateChanged, signOut, doc, getDoc, addDoc, updateDoc, deleteDoc,
+  collection, getDocs, query, where, orderBy, serverTimestamp, toast,
+  getClientIP, isIPAllowed, randomSlug
+} from './shared/app-core.js';
+
+let currentUser = null;
+
+document.getElementById('logoutBtn').addEventListener('click', async ()=>{ await signOut(auth); window.location.href='index.html'; });
+
+onAuthStateChanged(auth, async (user)=>{
+  if(!user){ window.location.href='index.html'; return; }
+  const uDoc = await getDoc(doc(db,'users',user.uid));
+  if(!uDoc.exists() || uDoc.data().role !== 'creator' || !uDoc.data().allowedByAdmin){
+    toast('Access not authorized', true);
+    await signOut(auth); window.location.href='index.html'; return;
+  }
+  const ip = await getClientIP();
+  if(!(await isIPAllowed(ip))){
+    sessionStorage.setItem('__blockedIP', ip || 'unknown');
+    window.location.href='blocked.html'; return;
+  }
+  currentUser = user;
+  document.getElementById('userEmail').textContent = uDoc.data().email;
+  loadForms();
+});
+
+async function loadForms(){
+  const grid = document.getElementById('formGrid');
+  const snap = await getDocs(query(collection(db,'forms'), where('creatorId','==',currentUser.uid)));
+  if(snap.empty){
+    grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1;">
+      <img src="assets/logo.png" alt="">
+      <div>No forms yet — create your first one.</div>
+    </div>`;
+    return;
+  }
+  let items = [];
+  snap.forEach(d=> items.push({id:d.id, ...d.data()}));
+  items.sort((a,b)=> (b.createdAtMs||0) - (a.createdAtMs||0));
+
+  let html='';
+  for(const f of items){
+    const subCount = await getSubmissionCount(f.id);
+    html += `
+    <div class="panel form-card" data-id="${f.id}">
+      <div class="fc-title">${escapeHTML(f.title || 'Untitled Form')}</div>
+      <div class="fc-meta">
+        <span class="status-dot ${f.status==='published'?'published':'draft'}"></span>
+        ${f.status==='published' ? 'Published' : 'Draft'}
+        <span>·</span><span>${subCount} response${subCount===1?'':'s'}</span>
+      </div>
+      <div class="fc-actions">
+        <button class="btn btn-ghost edit-btn">Edit</button>
+        <button class="btn btn-ghost responses-btn">Responses</button>
+        ${f.status==='published' ? `<button class="btn btn-gold copy-btn">Copy Link</button>` : ''}
+        <button class="btn btn-danger del-btn">Delete</button>
+      </div>
+    </div>`;
+  }
+  grid.innerHTML = html;
+
+  grid.querySelectorAll('.edit-btn').forEach(b=> b.addEventListener('click', e=>{
+    window.location.href = `builder.html?id=${e.target.closest('.form-card').dataset.id}`;
+  }));
+  grid.querySelectorAll('.responses-btn').forEach(b=> b.addEventListener('click', e=>{
+    window.location.href = `responses.html?id=${e.target.closest('.form-card').dataset.id}`;
+  }));
+  grid.querySelectorAll('.copy-btn').forEach(b=> b.addEventListener('click', e=>{
+    const id = e.target.closest('.form-card').dataset.id;
+    const f = items.find(x=>x.id===id);
+    const link = `${window.location.origin}${window.location.pathname.replace('dashboard.html','')}f.html?id=${f.publicSlug}`;
+    navigator.clipboard.writeText(link);
+    toast('Link copied to clipboard');
+  }));
+  grid.querySelectorAll('.del-btn').forEach(b=> b.addEventListener('click', async e=>{
+    const id = e.target.closest('.form-card').dataset.id;
+    if(!confirm('Delete this form permanently? This cannot be undone.')) return;
+    await deleteDoc(doc(db,'forms',id));
+    toast('Form deleted'); loadForms();
+  }));
+}
+
+async function getSubmissionCount(formId){
+  try{
+    const snap = await getDocs(collection(db, 'forms', formId, 'entries'));
+    return snap.size;
+  }catch(e){ return 0; }
+}
+
+document.getElementById('newFormBtn').addEventListener('click', async ()=>{
+  const ref = await addDoc(collection(db,'forms'), {
+    title:'Untitled Form',
+    description:'',
+    creatorId: currentUser.uid,
+    status:'draft',
+    publicSlug: randomSlug(),
+    schema: [],
+    theme: { accent:'#C9A227' },
+    createdAt: serverTimestamp(),
+    createdAtMs: Date.now(),
+    oneSubmissionPerUser: true
+  });
+  window.location.href = `builder.html?id=${ref.id}`;
+});
+
+function escapeHTML(s){
+  return (s||'').replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Form — Forms by Falcon Properties</title>
+<link rel="icon" href="assets/logo.png">
+<link rel="stylesheet" href="shared/styles.css">
+<style>
+  .page{ padding:50px 20px 80px; }
+  .form-wrap{ max-width:640px; margin:0 auto; }
+  .header-card{ padding:34px 34px 28px; margin-bottom:22px; text-align:center; }
+  .header-card img{ width:52px; margin-bottom:14px; }
+  .header-card h1{ font-size:24px; margin-bottom:8px; }
+  .header-card p{ color:var(--ink-soft); font-size:14px; line-height:1.6; }
+  .field-block{ padding:22px 24px; margin-bottom:16px; }
+  .field-block label.q{ font-weight:600; font-size:15px; display:block; margin-bottom:4px; }
+  .field-block label.q .req{ color:var(--danger); margin-left:3px; }
+  .field-block .help{ font-size:12.5px; color:var(--ink-soft); margin-bottom:12px; }
+  .scale-row{ display:flex; align-items:center; gap:12px; }
+  .scale-row input[type=range]{ flex:1; accent-color:var(--gold-deep); }
+  .scale-label-row{ display:flex; justify-content:space-between; font-size:11.5px; color:var(--ink-soft); margin-top:6px; }
+  .star-row{ display:flex; gap:8px; font-size:26px; cursor:pointer; }
+  .star{ color:#D8CFB4; transition:.15s; }
+  .star.active{ color:var(--gold); }
+  .nps-row{ display:flex; gap:6px; flex-wrap:wrap; }
+  .nps-btn{ width:34px; height:34px; border:1px solid var(--gold-line); border-radius:4px; background:var(--ivory-panel); cursor:pointer; font-size:13px; }
+  .nps-btn.active{ background:var(--gold); color:#241E12; border-color:var(--gold-deep); font-weight:700; }
+  .rank-item{ border:1px solid var(--gold-line); padding:10px 14px; border-radius:4px; margin-bottom:6px; background:var(--ivory-panel); cursor:grab; display:flex; align-items:center; gap:10px; }
+  .matrix-table{ width:100%; border-collapse:collapse; font-size:13px; }
+  .matrix-table th,.matrix-table td{ text-align:center; padding:8px 6px; border-bottom:1px solid var(--gold-line); }
+  .matrix-table th:first-child, .matrix-table td:first-child{ text-align:left; }
+  .sig-canvas{ border:1.5px dashed var(--gold-line); border-radius:4px; width:100%; height:140px; touch-action:none; cursor:crosshair; background:#fff; }
+  .file-drop{ border:1.5px dashed var(--gold-line); border-radius:4px; padding:22px; text-align:center; font-size:13px; color:var(--ink-soft); cursor:pointer; }
+  .submit-bar{ text-align:center; margin-top:26px; }
+  .already-card, .success-card{ text-align:center; padding:60px 34px; }
+  .success-card img{ width:56px; margin-bottom:18px; }
+</style>
+</head>
+<body>
+
+<div class="page">
+  <div class="form-wrap" id="formWrap">
+    <div class="falcon-loader" style="margin:80px auto;"></div>
+  </div>
+</div>
+
+<script type="module">
+import {
+  auth, db, onAuthStateChanged, doc, getDoc, getDocs, addDoc, collection, query, where, serverTimestamp, toast, getClientIP
+} from './shared/app-core.js';
+
+const params = new URLSearchParams(window.location.search);
+const slug = params.get('id');
+const previewFid = params.get('fid');
+const isPreview = params.get('preview') === '1';
+const wrap = document.getElementById('formWrap');
+
+let formDoc = null, formId = null, currentPage = 0, pages = [[]];
+const answers = {}; // fieldId -> value
+
+if(isPreview && previewFid){
+  // Preview: auth-gated direct lookup by internal formId, works for drafts too.
+  onAuthStateChanged(auth, async (user)=>{
+    if(!user){ showError('Sign in as the form owner to preview a draft.'); return; }
+    const snap = await getDoc(doc(db,'forms',previewFid));
+    if(!snap.exists()){ showError('This form does not exist or has been removed.'); return; }
+    formId = previewFid;
+    formDoc = snap.data();
+    buildPages();
+    renderForm();
+  });
+} else {
+  init();
+}
+
+async function init(){
+  if(!slug){ showError('No form specified.'); return; }
+  // NOTE: the 'status' filter here is required — it's what lets our Firestore security rule
+  // prove this query can only ever return published forms to anonymous visitors.
+  const snap = await getDocs(query(collection(db,'forms'), where('publicSlug','==',slug), where('status','==','published')));
+  if(snap.empty){ showError('This form does not exist, is unpublished, or has been removed.'); return; }
+  formId = snap.docs[0].id;
+  formDoc = snap.docs[0].data();
+
+  if(formDoc.oneSubmissionPerUser !== false){
+    const already = localStorage.getItem('__submitted_' + formId);
+    if(already){ showAlready(); return; }
+  }
+
+  buildPages();
+  renderForm();
+}
+
+function buildPages(){
+  pages = [[]];
+  (formDoc.schema||[]).forEach(f=>{
+    if(f.type === 'page_break'){ pages.push([]); }
+    else pages[pages.length-1].push(f);
+  });
+}
+
+function isFieldVisible(f){
+  if(!f.conditional) return true;
+  const dep = answers[f.conditional.onFieldId];
+  const target = f.conditional.equalsValue;
+  if(Array.isArray(dep)) return dep.includes(target);
+  if(typeof dep === 'boolean') return (target === 'checked') === dep;
+  return dep === target;
+}
+
+function renderForm(){
+  let html = `
+    <div class="panel header-card seal">
+      <img src="assets/logo.png" alt="">
+      <h1>${escapeHTML(formDoc.title)}</h1>
+      ${formDoc.description ? `<p>${escapeHTML(formDoc.description)}</p>` : ''}
+      ${isPreview ? `<div style="margin-top:10px; font-size:11.5px; color:var(--gold-deep); letter-spacing:.08em; text-transform:uppercase;">Preview Mode</div>` : ''}
+    </div>
+    ${pages.length>1 ? `<div style="text-align:center; font-size:12px; color:var(--ink-soft); margin-bottom:14px;">Page ${currentPage+1} of ${pages.length}</div>` : ''}
+  `;
+
+  const visibleFields = pages[currentPage].filter(isFieldVisible);
+  html += visibleFields.map(f => fieldHTML(f)).join('');
+
+  html += `<div class="submit-bar">
+    ${currentPage>0 ? `<button class="btn btn-ghost" id="backBtn" style="margin-right:10px;">Back</button>` : ''}
+    ${currentPage < pages.length-1
+      ? `<button class="btn btn-gold" id="nextBtn">Next</button>`
+      : `<button class="btn btn-gold" id="submitBtn">Submit${isPreview ? ' (disabled in preview)' : ''}</button>`}
+  </div>`;
+
+  wrap.innerHTML = html;
+  bindFieldEvents();
+
+  document.getElementById('nextBtn')?.addEventListener('click', ()=>{
+    if(!validatePage()) return;
+    currentPage++; window.scrollTo(0,0); renderForm();
+  });
+  document.getElementById('backBtn')?.addEventListener('click', ()=>{ currentPage--; window.scrollTo(0,0); renderForm(); });
+  document.getElementById('submitBtn')?.addEventListener('click', submitForm);
+  if(isPreview){ const sb=document.getElementById('submitBtn'); if(sb) sb.disabled = true; }
+}
+
+function fieldHTML(f){
+  if(f.type === 'section'){
+    return `<div class="wing-rule" style="margin:26px 0 14px;"><span class="diamond"></span></div>
+    <h3 style="text-align:center; margin-bottom:18px;">${escapeHTML(f.label)}</h3>`;
+  }
+  if(f.type === 'image_block'){
+    return f.mediaUrl ? `<div class="panel field-block" style="text-align:center;"><img src="${escapeAttr(f.mediaUrl)}" style="max-width:100%; border-radius:4px;"></div>` : '';
+  }
+  if(f.type === 'hidden') return '';
+
+  let control = '';
+  switch(f.type){
+    case 'short_text': control = `<input type="text" data-id="${f.id}" class="ans" placeholder="Your answer">`; break;
+    case 'long_text': control = `<textarea data-id="${f.id}" class="ans" placeholder="Your answer"></textarea>`; break;
+    case 'email': control = `<input type="email" data-id="${f.id}" class="ans" placeholder="name@example.com">`; break;
+    case 'phone': control = `<input type="tel" data-id="${f.id}" class="ans" placeholder="+91 00000 00000">`; break;
+    case 'number': control = `<input type="number" data-id="${f.id}" class="ans" placeholder="0">`; break;
+    case 'date': control = `<input type="date" data-id="${f.id}" class="ans">`; break;
+    case 'time': control = `<input type="time" data-id="${f.id}" class="ans">`; break;
+    case 'address': control = `<input type="text" data-id="${f.id}" class="ans" placeholder="Street, City, State, PIN">`; break;
+    case 'dropdown': control = `<select data-id="${f.id}" class="ans"><option value="">Select…</option>${(f.options||[]).map(o=>`<option>${escapeHTML(o)}</option>`).join('')}</select>`; break;
+    case 'radio': control = (f.options||[]).map((o,i)=>`<div class="opt-row"><input type="radio" name="${f.id}" value="${escapeAttr(o)}" data-id="${f.id}" class="ans-radio" id="${f.id}_${i}"><label for="${f.id}_${i}">${escapeHTML(o)}</label></div>`).join(''); break;
+    case 'checkbox': control = (f.options||[]).map((o,i)=>`<div class="opt-row"><input type="checkbox" value="${escapeAttr(o)}" data-id="${f.id}" class="ans-check" id="${f.id}_${i}"><label for="${f.id}_${i}">${escapeHTML(o)}</label></div>`).join(''); break;
+    case 'tickbox': control = `<div class="opt-row"><input type="checkbox" data-id="${f.id}" class="ans-tick" id="${f.id}"><label for="${f.id}">${escapeHTML(f.label)}</label></div>`; break;
+    case 'scale': control = `<div class="scale-row"><input type="range" min="${f.min}" max="${f.max}" step="${f.step||1}" value="${f.min}" data-id="${f.id}" class="ans-range"><span class="scale-val" id="val_${f.id}">${f.min}</span></div><div class="scale-label-row"><span>${escapeHTML(f.minLabel)}</span><span>${escapeHTML(f.maxLabel)}</span></div>`; break;
+    case 'rating': control = `<div class="star-row" data-id="${f.id}">${Array.from({length:f.maxStars||5},(_,i)=>`<span class="star" data-val="${i+1}">★</span>`).join('')}</div>`; break;
+    case 'nps': control = `<div class="nps-row" data-id="${f.id}">${Array.from({length:11},(_,i)=>`<button type="button" class="nps-btn" data-val="${i}">${i}</button>`).join('')}</div>`; break;
+    case 'ranking': control = `<div class="rank-list" data-id="${f.id}">${(f.options||[]).map(o=>`<div class="rank-item" draggable="true" data-val="${escapeAttr(o)}">☰ ${escapeHTML(o)}</div>`).join('')}</div>`; break;
+    case 'matrix': control = matrixHTML(f); break;
+    case 'file': control = `<div class="file-drop" data-id="${f.id}">⇧ Click to choose a file<input type="file" data-id="${f.id}" class="ans-file" style="display:none;"></div><div class="file-name" id="fn_${f.id}" style="font-size:12px; margin-top:6px; color:var(--ink-soft);"></div>`; break;
+    case 'signature': control = `<canvas class="sig-canvas" data-id="${f.id}" width="600" height="140"></canvas><button type="button" class="btn btn-ghost clear-sig" data-id="${f.id}" style="margin-top:8px; padding:6px 12px; font-size:11.5px;">Clear</button>`; break;
+  }
+
+  return `<div class="panel field-block" data-field-id="${f.id}">
+    <label class="q">${escapeHTML(f.label)}${f.required ? '<span class="req">*</span>' : ''}</label>
+    ${f.helpText ? `<div class="help">${escapeHTML(f.helpText)}</div>` : ''}
+    ${control}
+  </div>`;
+}
+
+function matrixHTML(f){
+  let html = `<table class="matrix-table" data-id="${f.id}"><thead><tr><th></th>${(f.columns||[]).map(c=>`<th>${escapeHTML(c)}</th>`).join('')}</tr></thead><tbody>`;
+  (f.rows||[]).forEach(r=>{
+    html += `<tr><td>${escapeHTML(r)}</td>${(f.columns||[]).map(c=>`<td><input type="radio" name="${f.id}_${r}" data-row="${escapeAttr(r)}" data-col="${escapeAttr(c)}" class="ans-matrix" data-id="${f.id}"></td>`).join('')}</tr>`;
+  });
+  return html + `</tbody></table>`;
+}
+
+function bindFieldEvents(){
+  wrap.querySelectorAll('.ans').forEach(el=>{
+    const evt = el.tagName === 'SELECT' ? 'change' : 'input';
+    el.addEventListener(evt, e=>{
+      answers[el.dataset.id] = el.value;
+      if(el.tagName === 'SELECT') refreshVisibility(); // only choice controls can drive conditional logic
+    });
+  });
+  wrap.querySelectorAll('.ans-radio').forEach(el=> el.addEventListener('change', e=>{ answers[el.dataset.id] = el.value; refreshVisibility(); }));
+  wrap.querySelectorAll('.ans-tick').forEach(el=> el.addEventListener('change', e=>{ answers[el.dataset.id] = el.checked; refreshVisibility(); }));
+  wrap.querySelectorAll('.ans-check').forEach(el=> el.addEventListener('change', ()=>{
+    const id = el.dataset.id;
+    const checked = Array.from(wrap.querySelectorAll(`.ans-check[data-id="${id}"]:checked`)).map(x=>x.value);
+    answers[id] = checked; refreshVisibility();
+  }));
+  wrap.querySelectorAll('.ans-range').forEach(el=> el.addEventListener('input', ()=>{ answers[el.dataset.id]=el.value; document.getElementById('val_'+el.dataset.id).textContent = el.value; }));
+
+  wrap.querySelectorAll('.star-row').forEach(row=>{
+    row.querySelectorAll('.star').forEach(star=>{
+      star.addEventListener('click', ()=>{
+        const val = Number(star.dataset.val);
+        answers[row.dataset.id] = val;
+        row.querySelectorAll('.star').forEach(s=> s.classList.toggle('active', Number(s.dataset.val) <= val));
+      });
+    });
+  });
+
+  wrap.querySelectorAll('.nps-row').forEach(row=>{
+    row.querySelectorAll('.nps-btn').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        answers[row.dataset.id] = Number(btn.dataset.val);
+        row.querySelectorAll('.nps-btn').forEach(b=> b.classList.toggle('active', b===btn));
+      });
+    });
+  });
+
+  wrap.querySelectorAll('.ans-matrix').forEach(el=> el.addEventListener('change', ()=>{
+    const id = el.dataset.id;
+    answers[id] = answers[id] || {};
+    answers[id][el.dataset.row] = el.dataset.col;
+  }));
+
+  wrap.querySelectorAll('.rank-list').forEach(list=>{
+    answers[list.dataset.id] = Array.from(list.children).map(c=>c.dataset.val);
+    let dragEl = null;
+    list.querySelectorAll('.rank-item').forEach(item=>{
+      item.addEventListener('dragstart', ()=> dragEl = item);
+      item.addEventListener('dragover', e=> e.preventDefault());
+      item.addEventListener('drop', ()=>{
+        if(dragEl && dragEl!==item){
+          const items = Array.from(list.children);
+          const from = items.indexOf(dragEl), to = items.indexOf(item);
+          list.insertBefore(dragEl, from < to ? item.nextSibling : item);
+          answers[list.dataset.id] = Array.from(list.children).map(c=>c.dataset.val);
+        }
+      });
+    });
+  });
+
+  wrap.querySelectorAll('.file-drop').forEach(drop=>{
+    const input = drop.querySelector('.ans-file');
+    drop.addEventListener('click', ()=> input.click());
+    input.addEventListener('change', ()=>{
+      const file = input.files[0];
+      if(file){
+        answers[drop.dataset.id] = { name:file.name, size:file.size, note:'File selected — stored client-side reference only. Wire to Firebase Storage for full upload.' };
+        document.getElementById('fn_'+drop.dataset.id).textContent = `Selected: ${file.name}`;
+      }
+    });
+  });
+
+  wrap.querySelectorAll('.sig-canvas').forEach(canvas=> setupSignature(canvas));
+  wrap.querySelectorAll('.clear-sig').forEach(btn=> btn.addEventListener('click', ()=>{
+    const canvas = wrap.querySelector(`.sig-canvas[data-id="${btn.dataset.id}"]`);
+    canvas.getContext('2d').clearRect(0,0,canvas.width,canvas.height);
+    answers[btn.dataset.id] = null;
+  }));
+}
+
+function setupSignature(canvas){
+  const ctx = canvas.getContext('2d');
+  ctx.strokeStyle = '#241E12'; ctx.lineWidth = 2; ctx.lineCap='round';
+  let drawing = false;
+  const pos = e=>{ const r = canvas.getBoundingClientRect(); const p = e.touches ? e.touches[0] : e; return { x:(p.clientX-r.left)*(canvas.width/r.width), y:(p.clientY-r.top)*(canvas.height/r.height) }; };
+  const start = e=>{ drawing=true; const p=pos(e); ctx.beginPath(); ctx.moveTo(p.x,p.y); };
+  const move = e=>{ if(!drawing) return; e.preventDefault(); const p=pos(e); ctx.lineTo(p.x,p.y); ctx.stroke(); answers[canvas.dataset.id]=canvas.toDataURL(); };
+  const end = ()=> drawing=false;
+  canvas.addEventListener('mousedown', start); canvas.addEventListener('mousemove', move); window.addEventListener('mouseup', end);
+  canvas.addEventListener('touchstart', start); canvas.addEventListener('touchmove', move); canvas.addEventListener('touchend', end);
+}
+
+function refreshVisibility(){
+  // Re-render only if a visibility-affecting change occurred — simplest robust approach is full re-render of current page
+  renderForm();
+}
+
+function validatePage(){
+  const visibleFields = pages[currentPage].filter(isFieldVisible);
+  for(const f of visibleFields){
+    if(f.required && f.type!=='section' && f.type!=='image_block'){
+      const val = answers[f.id];
+      const empty = val===undefined || val===null || val==='' || (Array.isArray(val) && val.length===0);
+      if(empty){ toast(`Please answer: ${f.label}`, true); return false; }
+    }
+  }
+  return true;
+}
+
+async function submitForm(){
+  if(isPreview) return;
+  if(!validatePage()) return;
+  const btn = document.getElementById('submitBtn');
+  btn.disabled = true; btn.textContent = 'Submitting…';
+
+  try{
+    const ip = await getClientIP();
+    await addDoc(collection(db,'forms',formId,'entries'), {
+      answers, submittedAt: serverTimestamp(), ip: ip || null, userAgent: navigator.userAgent
+    });
+    if(formDoc.oneSubmissionPerUser !== false){
+      localStorage.setItem('__submitted_' + formId, '1');
+    }
+    showSuccess();
+  }catch(err){
+    console.error(err);
+    toast('Submission failed — please try again', true);
+    btn.disabled = false; btn.textContent = 'Submit';
+  }
+}
+
+function showSuccess(){
+  wrap.innerHTML = `<div class="panel success-card">
+    <img src="assets/logo.png" alt="">
+    <h2 style="margin-bottom:10px;">Thank you</h2>
+    <p style="color:var(--ink-soft); font-size:14px;">Your response has been recorded.</p>
+  </div>`;
+}
+function showAlready(){
+  wrap.innerHTML = `<div class="panel already-card">
+    <img src="assets/logo.png" alt="" style="width:52px; margin-bottom:16px;">
+    <h2 style="margin-bottom:10px;">Already submitted</h2>
+    <p style="color:var(--ink-soft); font-size:14px;">This form only accepts one response per person, and a response has already been recorded from this browser.</p>
+  </div>`;
+}
+function showError(msg){
+  wrap.innerHTML = `<div class="panel already-card"><h2 style="margin-bottom:10px;">Unavailable</h2><p style="color:var(--ink-soft); font-size:14px;">${escapeHTML(msg)}</p></div>`;
+}
+
+function escapeHTML(s){ return (s||'').replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+function escapeAttr(s){ return escapeHTML(s); }
+</script>
+</body>
+</html>
