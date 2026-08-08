@@ -88,7 +88,7 @@
 import {
   auth, db, onAuthStateChanged, signOut, doc, getDoc, setDoc, updateDoc, deleteDoc,
   collection, getDocs, query, where, toast, getClientIP, isIPAllowed
-} from 'app-core.js';
+} from './app-core.js';
 
 document.getElementById('logoutBtn').addEventListener('click', async ()=>{ await signOut(auth); window.location.href='superadmin.html'; });
 
