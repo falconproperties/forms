@@ -1,0 +1,187 @@
+/* ============================================================
+   FORMS BY FALCON PROPERTIES — Design System
+   Palette: Crème field, royal gold accent, ink text
+   Type: Fraunces (display, luxury real-estate serif) + Outfit (utility)
+   Signature: hairline "wing" double-rule dividers + gold foil corner seal
+   ============================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,500;9..144,600;9..144,700;9..144,900&family=Outfit:wght@300;400;500;600;700&display=swap');
+
+:root{
+  --creme:        #FAF5E9;
+  --creme-deep:   #F1E9D6;
+  --ivory-panel:  #FFFDF8;
+  --ink:          #241E12;
+  --ink-soft:     #5B5240;
+  --gold:         #C9A227;
+  --gold-bright:  #E7C34C;
+  --gold-deep:    #9C7A1B;
+  --gold-line:    rgba(201,162,39,0.35);
+  --danger:       #A23B2E;
+  --success:      #3E6B4A;
+
+  --radius:       2px;
+  --radius-lg:    4px;
+  --shadow-gold:  0 1px 0 rgba(201,162,39,0.5), 0 12px 30px -14px rgba(36,30,18,0.25);
+  --ease:         cubic-bezier(.22,.61,.36,1);
+}
+
+*{ box-sizing:border-box; }
+html{ scroll-behavior:smooth; }
+body{
+  margin:0;
+  background:var(--creme);
+  color:var(--ink);
+  font-family:'Outfit',sans-serif;
+  font-weight:400;
+  -webkit-font-smoothing:antialiased;
+}
+
+h1,h2,h3,.display{
+  font-family:'Fraunces',serif;
+  font-weight:700;
+  letter-spacing:-0.01em;
+  color:var(--ink);
+  margin:0;
+}
+
+.eyebrow{
+  font-family:'Outfit',sans-serif;
+  font-size:11px;
+  letter-spacing:.22em;
+  text-transform:uppercase;
+  color:var(--gold-deep);
+  font-weight:600;
+}
+
+/* ---------- Signature: hairline double-rule "wing" divider ---------- */
+.wing-rule{
+  display:flex; align-items:center; gap:10px;
+  width:100%; margin:0; user-select:none;
+}
+.wing-rule::before,.wing-rule::after{
+  content:""; flex:1; height:1px;
+  background:linear-gradient(90deg,transparent, var(--gold-line) 20%, var(--gold-line) 80%, transparent);
+}
+.wing-rule .diamond{
+  width:6px;height:6px;transform:rotate(45deg);
+  background:var(--gold); flex-shrink:0;
+}
+
+/* ---------- Gold-bordered surfaces ---------- */
+.panel{
+  background:var(--ivory-panel);
+  border:1px solid var(--gold-line);
+  border-radius:var(--radius-lg);
+  box-shadow:var(--shadow-gold);
+}
+.panel-hairline{
+  border:1px solid var(--gold-line);
+  border-radius:var(--radius);
+}
+
+/* corner seal (gold foil dot) used on cards for "signature" moments */
+.seal{
+  position:relative;
+}
+.seal::after{
+  content:"";
+  position:absolute; top:10px; right:10px;
+  width:6px;height:6px;border-radius:50%;
+  background:radial-gradient(circle at 30% 30%, var(--gold-bright), var(--gold-deep));
+  box-shadow:0 0 0 3px rgba(201,162,39,0.12);
+}
+
+/* ---------- Buttons ---------- */
+.btn{
+  font-family:'Outfit',sans-serif;
+  font-weight:600; font-size:13px; letter-spacing:.02em;
+  padding:12px 22px;
+  border-radius:var(--radius);
+  border:1px solid var(--gold-line);
+  background:transparent;
+  color:var(--ink);
+  cursor:pointer;
+  transition:all .25s var(--ease);
+  display:inline-flex; align-items:center; justify-content:center; gap:8px;
+}
+.btn:hover{ border-color:var(--gold); background:rgba(201,162,39,0.06); }
+.btn-gold{
+  background:linear-gradient(180deg, var(--gold-bright), var(--gold));
+  border-color:var(--gold-deep);
+  color:#241E12;
+  box-shadow:0 1px 0 rgba(255,255,255,.4) inset, 0 8px 18px -8px rgba(156,122,27,.55);
+}
+.btn-gold:hover{ filter:brightness(1.05); transform:translateY(-1px); }
+.btn-gold:active{ transform:translateY(0); }
+.btn-ghost{ border-color:transparent; color:var(--ink-soft); }
+.btn-ghost:hover{ color:var(--ink); border-color:var(--gold-line); }
+.btn-danger{ border-color:rgba(162,59,46,.35); color:var(--danger); }
+.btn-danger:hover{ background:rgba(162,59,46,.06); border-color:var(--danger); }
+.btn:disabled{ opacity:.45; cursor:not-allowed; }
+.btn-block{ width:100%; }
+
+/* ---------- Inputs ---------- */
+.field-label{
+  display:block; font-size:12.5px; font-weight:600; color:var(--ink);
+  margin-bottom:7px; letter-spacing:.01em;
+}
+.field-help{ font-size:12px; color:var(--ink-soft); margin-top:6px; }
+input[type=text],input[type=email],input[type=password],input[type=number],
+input[type=date],input[type=time],input[type=tel],input[type=url],
+textarea, select{
+  width:100%;
+  font-family:'Outfit',sans-serif;
+  font-size:14.5px;
+  color:var(--ink);
+  background:var(--ivory-panel);
+  border:1px solid var(--gold-line);
+  border-radius:var(--radius);
+  padding:12px 14px;
+  transition:border-color .2s var(--ease), box-shadow .2s var(--ease);
+}
+textarea{ resize:vertical; min-height:90px; font-family:'Outfit',sans-serif; }
+input:focus, textarea:focus, select:focus{
+  outline:none;
+  border-color:var(--gold);
+  box-shadow:0 0 0 3px rgba(201,162,39,0.12);
+}
+input::placeholder, textarea::placeholder{ color:#B8AE94; }
+
+/* checkbox / radio */
+.opt-row{ display:flex; align-items:center; gap:10px; padding:8px 0; }
+.opt-row input[type=checkbox], .opt-row input[type=radio]{
+  width:17px; height:17px; accent-color:var(--gold-deep); cursor:pointer;
+}
+
+/* ---------- Loader ---------- */
+.falcon-loader{
+  width:34px; height:34px; border-radius:50%;
+  border:2px solid var(--gold-line); border-top-color:var(--gold);
+  animation:spin .9s linear infinite;
+}
+@keyframes spin{ to{ transform:rotate(360deg); } }
+
+/* ---------- Scrollbar ---------- */
+::-webkit-scrollbar{ width:9px; height:9px; }
+::-webkit-scrollbar-track{ background:var(--creme); }
+::-webkit-scrollbar-thumb{ background:var(--gold-line); border-radius:6px; }
+::-webkit-scrollbar-thumb:hover{ background:var(--gold); }
+
+/* ---------- Utility ---------- */
+.container{ max-width:1180px; margin:0 auto; padding:0 28px; }
+.center-screen{ min-height:100vh; display:flex; align-items:center; justify-content:center; }
+.hidden{ display:none !important; }
+.toast{
+  position:fixed; bottom:26px; left:50%; transform:translateX(-50%) translateY(20px);
+  background:var(--ink); color:var(--creme); font-size:13.5px; font-weight:500;
+  padding:13px 22px; border-radius:var(--radius); border:1px solid var(--gold-line);
+  opacity:0; pointer-events:none; transition:all .35s var(--ease); z-index:9999;
+  letter-spacing:.01em;
+}
+.toast.show{ opacity:1; transform:translateX(-50%) translateY(0); }
+.toast.error{ border-color:rgba(162,59,46,.5); }
+
+@media (prefers-reduced-motion: reduce){
+  *{ animation-duration:.001ms !important; transition-duration:.001ms !important; }
+}
